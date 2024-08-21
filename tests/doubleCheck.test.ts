@@ -1,10 +1,11 @@
+// tests/doubleCheck.test.ts
 import { doubleCheck } from '../src/doubleCheck';
 import fs from 'fs/promises';
 import path from 'path';
 import cliProgress from 'cli-progress';
 
 describe('doubleCheck', () => {
-  const testDir = path.join(__dirname);
+  const testDir = __dirname;
 
   it('should correctly verify all test cases', async () => {
     const files = await fs.readdir(testDir);
