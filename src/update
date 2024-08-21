@@ -1,0 +1,7 @@
+#!/bin/zsh
+
+# Get the directory of this script
+DIR="${0:A:h}"
+
+# Run the Node.js script with all passed arguments
+node "$DIR/update.js" "$@"
