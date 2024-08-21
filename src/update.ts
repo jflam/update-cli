@@ -2,7 +2,6 @@ import fs from "fs/promises";
 import path from "path";
 import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
-import clipboardy from "clipboardy";
 import { doubleCheck } from "./doubleCheck";
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 
@@ -35,12 +34,13 @@ async function writeFile(filePath: string, content: string): Promise<void> {
 
 async function getClipboardContent(): Promise<string> {
     try {
-        return await clipboardy.read();
+      const clipboardy = await import('clipboardy');
+      return await clipboardy.default.read();
     } catch (error) {
-        console.error(`Error reading clipboard: ${(error as Error).message}`);
-        process.exit(1);
+      console.error(`Error reading clipboard: ${(error as Error).message}`);
+      process.exit(1);
     }
-}
+  }
 
 async function callGeminiAPI(prompt: string): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;

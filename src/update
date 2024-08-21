@@ -3,5 +3,5 @@
 # Get the directory of this script
 DIR="${0:A:h}"
 
-# Run the Node.js script with all passed arguments
-node "$DIR/update.js" "$@"
+# Run the TypeScript file directly with ts-node
+npx ts-node "$DIR/update.ts" "$@"
