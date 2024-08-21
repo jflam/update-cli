@@ -90,13 +90,67 @@ async function main() {
   const clipboardContent = await getClipboardContent();
 
   const prompt = `
-Please apply the changes specified by CHANGES to FILE. Please respond with only the modified code in a single code block, without any additional commentary.
+Please apply the changes within the <changes>code changes</changes> to 
+<file>file contents</file>. 
 
-CHANGES:
+<changes>
+\`\`\`
+function firstFunction() {
+}
+
+function newFunction() {
+}
+
+function secondFunction() {
+}
+\`\`\`
+</changes>
+
+<file>
+\`\`\`
+function zeroFunction() {
+}
+
+function firstFunction() {
+}
+
+function secondFunction() {
+}
+
+function thirdFunction() {
+}
+\`\`\`
+</file>
+
+Result:
+\`\`\`
+function zeroFunction() {
+}
+
+function firstFunction() {
+}
+
+function newFunction() {
+}
+
+function secondFunction() {
+}
+
+function thirdFunction() {
+}
+\`\`\`
+
+<changes>
+\`\`\`
 ${clipboardContent}
+\`\`\`
+</changes>
 
-FILE:
+<file>
+\`\`\`
 ${fileContent}
+\`\`\`
+</file>
   `;
 
   if (isDebug) {
