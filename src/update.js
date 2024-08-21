@@ -74,7 +74,9 @@ async function main() {
   const clipboardContent = await getClipboardContent();
 
   const prompt = `
-Please apply the changes specified by 
+Please apply the changes specified by CHANGES to FILE. In your output, only
+include the final version of the FILE after applying the changes. Do not add
+any commentary as the output will be used as the final version of the file.
 
 CHANGES:
 ${clipboardContent}
@@ -97,3 +99,4 @@ main().catch(error => {
   console.error('An unexpected error occurred:', error);
   process.exit(1);
 });
+  
