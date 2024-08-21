@@ -11,6 +11,11 @@ const argv = yargs(hideBin(process.argv))
     type: 'boolean',
     description: 'Print the modified content to the console'
   })
+  .option('debug', {
+    alias: 'd',
+    type: 'boolean',
+    description: 'Output the prompt for manual testing in Google AI Studio'
+  })
   .help('help')
   .alias('help', 'h')
   .demandCommand(1, 'Please provide a file path')
@@ -18,6 +23,7 @@ const argv = yargs(hideBin(process.argv))
 
 const filePath = argv._[0];
 const shouldPrint = argv.print;
+const isDebug = argv.debug;
 
 async function readFile(path) {
   try {
@@ -69,23 +75,40 @@ async function callGeminiAPI(prompt) {
   }
 }
 
+function extractCodeBlock(text) {
+  const codeBlockRegex = /```(?:\w+\n)?([\s\S]*?)```/;
+  const match = text.match(codeBlockRegex);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  console.warn("No code block found in the response. Returning the full response.");
+  return text;
+}
+
 async function main() {
   const fileContent = await readFile(filePath);
   const clipboardContent = await getClipboardContent();
 
   const prompt = `
-Please apply the changes specified by CHANGES to FILE. In your output, only
-include the final version of the FILE after applying the changes. Do not add
-any commentary as the output will be used as the final version of the file.
+Please apply the changes specified by 
 
 CHANGES:
 ${clipboardContent}
 
 FILE:
 ${fileContent}
+
+Please respond with only the modified code in a single code block, without any additional commentary.
   `;
 
-  const modifiedContent = await callGeminiAPI(prompt);
+  if (isDebug) {
+    console.log('Prompt for manual testing in Google AI Studio:');
+    console.log(prompt);
+    return;
+  }
+
+  const fullResponse = await callGeminiAPI(prompt);
+  const modifiedContent = extractCodeBlock(fullResponse);
 
   if (shouldPrint) {
     console.log('Modified content:');
@@ -99,4 +122,3 @@ main().catch(error => {
   console.error('An unexpected error occurred:', error);
   process.exit(1);
 });
-  
