@@ -75,49 +75,6 @@ async function callGeminiAPI(prompt) {
   }
 }
 
-function extractCodeBlock(text) {
-  const codeBlockRegex = /```(?:\w+\n)?([\s\S]*?)```/;
-  const match = text.match(codeBlockRegex);
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-  console.warn("No code block found in the response. Returning the full response.");
-  return text;
-}
-
-async function main() {
-  const fileContent = await readFile(filePath);
-  const clipboardContent = await getClipboardContent();
-
-  const prompt = `
-Please apply the changes specified by 
-
-CHANGES:
-${clipboardContent}
-
-FILE:
-${fileContent}
-
-Please respond with only the modified code in a single code block, without any additional commentary.
-  `;
-
-  if (isDebug) {
-    console.log('Prompt for manual testing in Google AI Studio:');
-    console.log(prompt);
-    return;
-  }
-
-  const fullResponse = await callGeminiAPI(prompt);
-  const modifiedContent = extractCodeBlock(fullResponse);
-
-  if (shouldPrint) {
-    console.log('Modified content:');
-    console.log(modifiedContent);
-  }
-
-  await writeFile(filePath, modifiedContent);
-}
-
 main().catch(error => {
   console.error('An unexpected error occurred:', error);
   process.exit(1);
