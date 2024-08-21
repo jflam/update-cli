@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
 import { doubleCheck } from "./doubleCheck";
@@ -34,13 +35,13 @@ async function writeFile(filePath: string, content: string): Promise<void> {
 
 async function getClipboardContent(): Promise<string> {
     try {
-      const clipboardy = await import('clipboardy');
-      return await clipboardy.default.read();
+        const clipboardy = await import('clipboardy');
+        return await clipboardy.default.read();
     } catch (error) {
-      console.error(`Error reading clipboard: ${(error as Error).message}`);
-      process.exit(1);
+        console.error(`Error reading clipboard: ${(error as Error).message}`);
+        process.exit(1);
     }
-  }
+}
 
 async function callGeminiAPI(prompt: string): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -110,9 +111,59 @@ async function generateTestCase(
     }
 }
 
+async function applyChangesWithDoubleCheck(
+    filePath: string,
+    originalContent: string,
+    clipboardContent: string,
+    isPrintMode: boolean
+): Promise<void> {
+    const prompt = `
+    Please apply the changes within the <changes>code changes</changes> to 
+    <file>file contents</file>. 
+    
+    <changes>
+    \`\`\`
+    ${clipboardContent}
+    \`\`\`
+    </changes>
+    
+    <file>
+    \`\`\`
+    ${originalContent}
+    \`\`\`
+    </file>
+    `;
+
+    const modifiedContent = await callGeminiAPI(prompt);
+
+    // Create a temporary file
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'update-'));
+    const tmpFile = path.join(tmpDir, 'temp_update');
+    await writeFile(tmpFile, modifiedContent);
+
+    // Perform double-check
+    const [passed, message] = await doubleCheck(originalContent, clipboardContent, modifiedContent);
+
+    if (passed) {
+        if (isPrintMode) {
+            console.log("Double-check passed. Modified content:");
+            console.log(modifiedContent);
+        } else {
+            await writeFile(filePath, modifiedContent);
+            console.log("Double-check passed. File updated successfully.");
+        }
+    } else {
+        console.error(`Double-check failed: ${message}`);
+        console.error("The file was not updated.");
+    }
+
+    // Clean up temporary file
+    await fs.rm(tmpDir, { recursive: true, force: true });
+}
+
 async function main() {
     const argv = (await yargs(hideBin(process.argv))
-        .usage("Usage: $0 <file_path> [options]")
+        .usage("Usage: update <file_path> [options]")
         .positional("filePath", {
             describe: "Path to the file to be updated",
             type: "string",
@@ -120,13 +171,12 @@ async function main() {
         .option("print", {
             alias: "p",
             type: "boolean",
-            description: "Print the modified content to the console",
+            description: "Print the modified content to the console without updating the file",
         })
         .option("debug", {
             alias: "d",
             type: "boolean",
-            description:
-                "Output the prompt for manual testing in Google AI Studio",
+            description: "Output the prompt for manual testing in Google AI Studio",
         })
         .option("test", {
             alias: "t",
@@ -135,6 +185,14 @@ async function main() {
         })
         .help("help")
         .alias("help", "h")
+        .epilogue(`
+This script updates a file by applying changes from the clipboard using AI. 
+It reads the target file, applies changes based on clipboard content, and 
+performs a double-check before applying the update.
+
+Note: This script uses the Gemini API to generate changes. Ensure your 
+GEMINI_API_KEY is set in the environment.
+        `)
         .demandCommand(1, "Please provide a file path")
         .parse()) as Args;
 
@@ -144,38 +202,27 @@ async function main() {
 
     if (argv.test) {
         await generateTestCase(filePath, clipboardContent);
-    } else {
+    } else if (argv.debug) {
         const prompt = `
-  Please apply the changes within the <changes>code changes</changes> to 
-  <file>file contents</file>. 
-  
-  <changes>
-  \`\`\`
-  ${clipboardContent}
-  \`\`\`
-  </changes>
-  
-  <file>
-  \`\`\`
-  ${fileContent}
-  \`\`\`
-  </file>
-      `;
-
-        if (argv.debug) {
-            console.log("Prompt for manual testing in Google AI Studio:");
-            console.log(prompt);
-            return;
-        }
-
-        const modifiedContent = await callGeminiAPI(prompt);
-
-        if (argv.print) {
-            console.log("Modified content:");
-            console.log(modifiedContent);
-        } else {
-            await writeFile(filePath, modifiedContent);
-        }
+        Please apply the changes within the <changes>code changes</changes> to 
+        <file>file contents</file>. 
+        
+        <changes>
+        \`\`\`
+        ${clipboardContent}
+        \`\`\`
+        </changes>
+        
+        <file>
+        \`\`\`
+        ${fileContent}
+        \`\`\`
+        </file>
+        `;
+        console.log("Prompt for manual testing in Google AI Studio:");
+        console.log(prompt);
+    } else {
+        await applyChangesWithDoubleCheck(filePath, fileContent, clipboardContent, argv.print || false);
     }
 }
 
