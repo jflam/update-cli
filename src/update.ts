@@ -12,6 +12,8 @@ interface Args {
     print?: boolean;
     debug?: boolean;
     test?: boolean;
+    _: (string | number)[];
+    $0: string;
 }
 
 async function readFile(filePath: string): Promise<string> {
@@ -35,7 +37,7 @@ async function writeFile(filePath: string, content: string): Promise<void> {
 
 async function getClipboardContent(): Promise<string> {
     try {
-        const clipboardy = await import('clipboardy');
+        const clipboardy = await import("clipboardy");
         return await clipboardy.default.read();
     } catch (error) {
         console.error(`Error reading clipboard: ${(error as Error).message}`);
@@ -137,12 +139,16 @@ async function applyChangesWithDoubleCheck(
     const modifiedContent = await callGeminiAPI(prompt);
 
     // Create a temporary file
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'update-'));
-    const tmpFile = path.join(tmpDir, 'temp_update');
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "update-"));
+    const tmpFile = path.join(tmpDir, "temp_update");
     await writeFile(tmpFile, modifiedContent);
 
     // Perform double-check
-    const [passed, message] = await doubleCheck(originalContent, clipboardContent, modifiedContent);
+    const [passed, message] = await doubleCheck(
+        originalContent,
+        clipboardContent,
+        modifiedContent
+    );
 
     if (passed) {
         if (isPrintMode) {
@@ -162,11 +168,13 @@ async function applyChangesWithDoubleCheck(
 }
 
 async function main() {
-    const argv = (await yargs(hideBin(process.argv))
-        .usage("Usage: update <file_path> [options]")
-        .positional("filePath", {
-            describe: "Path to the file to be updated",
-            type: "string",
+    const yargsInstance = yargs(hideBin(process.argv))
+        .command('$0 <filePath>', 'Update a file', (yargs) => {
+            return yargs.positional('filePath', {
+                describe: 'Path to the file to be updated',
+                type: 'string',
+                demandOption: true
+            })
         })
         .option("print", {
             alias: "p",
@@ -192,16 +200,20 @@ performs a double-check before applying the update.
 
 Note: This script uses the Gemini API to generate changes. Ensure your 
 GEMINI_API_KEY is set in the environment.
-        `)
-        .demandCommand(1, "Please provide a file path")
-        .parse()) as Args;
+        `);
 
-    const filePath = argv.filePath;
-    const fileContent = await readFile(filePath);
+    const argv = await yargsInstance.parse() as Args;
+    
+    if (!argv.filePath) {
+        console.error("Error: filePath is required");
+        process.exit(1);
+    }
+
+    const fileContent = await readFile(argv.filePath);
     const clipboardContent = await getClipboardContent();
 
     if (argv.test) {
-        await generateTestCase(filePath, clipboardContent);
+        await generateTestCase(argv.filePath, clipboardContent);
     } else if (argv.debug) {
         const prompt = `
         Please apply the changes within the <changes>code changes</changes> to 
@@ -222,7 +234,12 @@ GEMINI_API_KEY is set in the environment.
         console.log("Prompt for manual testing in Google AI Studio:");
         console.log(prompt);
     } else {
-        await applyChangesWithDoubleCheck(filePath, fileContent, clipboardContent, argv.print || false);
+        await applyChangesWithDoubleCheck(
+            argv.filePath,
+            fileContent,
+            clipboardContent,
+            argv.print || false
+        );
     }
 }
 
